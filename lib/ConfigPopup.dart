@@ -1,62 +1,74 @@
 import 'package:flutter/material.dart';
-import 'dart:io' show Platform, stdout;
+import 'package:global_configuration/global_configuration.dart';
+import 'dart:io';
+import 'dart:convert'; //to convert json to maps and vice versa
 
-final _dirKey = GlobalKey<FormState>();
-final _userKey = GlobalKey<FormState>();
-final _passKey = GlobalKey<FormState>();
+final _formKey = GlobalKey<FormState>();
 
-_submitScanInfo() {
-  String os = Platform.operatingSystem;
-  String home = "";
+final _usernameController = TextEditingController();
+final _passwordController = TextEditingController();
+final _dirController = TextEditingController();
+
+String configPath() {
+  String configFile = "";
   Map<String, String> envVars = Platform.environment;
-  if (Platform.isMacOS) {
-    home = envVars['HOME'];
-  } else if (Platform.isLinux) {
-    home = envVars['HOME'];
+  if (Platform.isMacOS || Platform.isLinux) {
+    configFile = envVars['HOME'] + "/.scans-config.json";
   } else if (Platform.isWindows) {
-    home = envVars['UserProfile'];
+    configFile = envVars['UserProfile'] + '\\.scans-config.json';
   }
-  final configFile = home + "/.scans-config.json";
-  print(configFile);
+  return configFile;
+}
+
+void _submitScanInfo() {
+  Map<String, dynamic> jsonData = {
+    "username": _usernameController.value.text,
+    "password": _passwordController.value.text,
+    "dir": _dirController.value.text,
+  };
+
+  final jsonString = jsonEncode(jsonData);
+  final filePath = new File(configPath());
+  filePath.writeAsString(jsonString);
+  GlobalConfiguration().add(jsonData);
 }
 
 Widget buildPopupDialog(BuildContext context) {
-  final TextEditingController _controller = new TextEditingController();
-
   return new AlertDialog(
     title: const Text('User Config Missing'),
-    content: new Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Text("Enter User Config to begin using the scans program."),
-        TextFormField(
-          controller: _controller,
-          decoration: const InputDecoration(
-            hintText: 'Enter Directory name',
+    content: new Form(
+      child: new Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text("Enter User Config to begin using the scans program."),
+          TextFormField(
+            controller: _dirController,
+            decoration: const InputDecoration(
+              hintText: 'Enter Directory name',
+            ),
           ),
-        ),
-        TextField(
-          controller: _controller,
-          decoration: const InputDecoration(
-            hintText: 'Enter username',
+          TextField(
+            controller: _usernameController,
+            decoration: const InputDecoration(
+              hintText: 'Enter username',
+            ),
           ),
-        ),
-        TextFormField(
-          decoration: const InputDecoration(
-            hintText: 'Enter password'
-          ),
-        )
-      ],
-    ),
-    actions: <Widget>[
-      new TextButton(
-        onPressed: () {
-          _submitScanInfo();
-          Navigator.of(context).pop();
-        },
-        child: const Text('Close'),
+          TextFormField(
+            controller: _passwordController,
+            obscureText: true,
+            decoration: const InputDecoration(
+                hintText: 'Enter password'
+            )),
+            ElevatedButton(
+              onPressed: () {
+                _submitScanInfo();
+                Navigator.of(context).pop();
+              },
+              child: const Text('Submit'),
+            ),
+        ],
       ),
-    ],
+    ),
   );
 }

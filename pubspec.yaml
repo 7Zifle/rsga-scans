@@ -22,6 +22,8 @@ environment:
 
 dependencies:
   ftpconnect: ^0.2.1
+  global_configuration: ^1.6.0
+  desktop_window: ^0.4.0
 
   flutter:
     sdk: flutter
@@ -32,6 +34,7 @@ dependencies:
   cupertino_icons: ^1.0.2
 
 dev_dependencies:
+  flutter_launcher_icons: "^0.8.0"
   flutter_test:
     sdk: flutter
 

@@ -1,4 +1,11 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:desktop_window/desktop_window.dart';
+import 'package:ftpconnect/ftpconnect.dart';
+import 'package:global_configuration/global_configuration.dart';
+
 import 'ConfigPopup.dart';
 
 void main() {
@@ -6,21 +13,11 @@ void main() {
 }
 
 class MyApp extends StatelessWidget {
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'RGSA Scans App',
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // Try running your application with "flutter run". You'll see the
-        // application has a blue toolbar. Then, without quitting the app, try
-        // changing the primarySwatch below to Colors.green and then invoke
-        // "hot reload" (press "r" in the console where you ran "flutter run",
-        // or simply save your changes to "hot reload" in a Flutter IDE).
-        // Notice that the counter didn't reset back to zero; the application
-        // is not restarted.
         primarySwatch: Colors.blueGrey,
       ),
       home: MyHomePage(),
@@ -36,58 +33,106 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
+  @override
+  void initState() {
+    DesktopWindow.setWindowSize(Size(480, 600));
+    final configFile = new File(configPath());
+
+    if (configFile.existsSync()) {
+      String jsonString = configFile.readAsStringSync();
+      Map<String, dynamic> jsonData = jsonDecode(jsonString);
+      GlobalConfiguration().add(jsonData);
+    }
+    super.initState();
+  }
+
+  Widget buildPopupRetrieving(BuildContext context) {
+    return new AlertDialog(
+      content: new Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Padding(
+              padding: EdgeInsets.only(top: 30.0, bottom: 45.0),
+              child: CircularProgressIndicator()),
+          Text('Retrieving Scans.'),
+        ],
+      ),
+    );
+  }
+
+  Future<bool> downloadScans() async {
+    final conf = GlobalConfiguration();
+    FTPConnect ftp = FTPConnect('10.150.0.18',
+        user: conf.getValue('username'), pass: conf.getValue('password'));
+    if (await ftp.connect() == false) {
+      return false;
+    }
+    if (await ftp.changeDirectory(conf.getValue('dir')) == false) {
+      return false;
+    }
+    List<String> fileNames = await ftp.listDirectoryContentOnlyNames();
+    for (var i = 0; i < fileNames.length; i++) {
+      var element = fileNames[i];
+      bool res = await ftp.downloadFile(element, File('C:\\Scans\\' + element));
+      if (res == true) {
+        await ftp.deleteFile(element);
+      }
+    }
+    //TODO delete files in scans folder
+    await ftp.disconnect();
+    return true;
+  }
+
+  void resultSnack(bool res) {
+    if (res == true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Successfully Retrieved Scans!')));
+    } else {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Failed retrieving scans!')));
+    }
+    Navigator.pop(context);
+  }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
       body: Center(
         // Center is a layout widget. It takes a single child and positions it
         // in the middle of the parent.
         child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Invoke "debug painting" (press "p" in the console, choose the
-          // "Toggle Debug Paint" action from the Flutter Inspector in Android
-          // Studio, or the "Toggle Debug Paint" command in Visual Studio Code)
-          // to see the wireframe for each widget.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
             Container(
               child: Image.asset('assets/img/rgsa-logo-lg.png'),
-              margin: EdgeInsets.only(bottom: 100.0),
+              margin: EdgeInsets.only(bottom: 50.0),
             ),
             Text(
               'Simply press the start scans button below to retrieve your scans!',
             ),
-
-            TextField(
-            ),
             Container(
               width: 150.0,
-              height: 60.0,
-              margin: EdgeInsets.only(top: 100.0),
+              height: 45.0,
+              margin: EdgeInsets.only(top: 50.0),
               child: ElevatedButton(
                 child: Text('Start Scans'),
                 onPressed: () {
-                  showDialog(
-                    context: context,
-                    builder: (BuildContext context) =>
-                        buildPopupDialog(context),
-                  );
+                  final conf = GlobalConfiguration();
+                  if (conf.getValue("username") == null) {
+                    showDialog(
+                      context: context,
+                      builder: (BuildContext context) =>
+                          buildPopupDialog(context),
+                    );
+                  } else {
+                    final popup = buildPopupRetrieving(context);
+                    showDialog(
+                      context: context,
+                      builder: (BuildContext context) => popup,
+                    );
+                    downloadScans().then((value) => resultSnack(value));
+                  }
                 },
               ),
             ),
