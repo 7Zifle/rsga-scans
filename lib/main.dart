@@ -35,7 +35,6 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
-    DesktopWindow.setWindowSize(Size(480, 600));
     final configFile = new File(configPath());
 
     if (configFile.existsSync()) {
